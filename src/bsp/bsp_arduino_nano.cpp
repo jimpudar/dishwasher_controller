@@ -1,14 +1,18 @@
-﻿#include "bsp.h"
+﻿#include "active_objects.h"
+#include "bsp.h"
 #include "qpn.h"
 
-#include "common.h"
 #include "constants.h"
+#include "qm_generated/dishwasher_sm.h"
 #include "signals.h"
 #include <Arduino.h>
 
-// Arduino Pin Mapping
 enum
 {
+    BSP_TICKS_PER_SEC = 100, // number of system clock ticks in one second
+    DEBOUNCE_COUNT = 5, // number of ticks an input needs to be stable to count
+
+    NUM_OUTPUTS = 8,
     PIN_OUTPUT_RELAY_MOTOR = 2,
     PIN_OUTPUT_RELAY_HEATER = 3,
     PIN_OUTPUT_RELAY_FILL = 4,
@@ -18,6 +22,7 @@ enum
     PIN_OUTPUT_INDICATOR_RINSE = 8,
     PIN_OUTPUT_INDICATOR_READY = 9,
 
+    NUM_INPUTS = 6,
     PIN_INPUT_SWITCH_DOOR = 10,
     PIN_INPUT_SWITCH_FLOAT = 11,
     PIN_INPUT_SWITCH_MANUALRINSE = A4,
@@ -25,7 +30,7 @@ enum
     PIN_INPUT_SWITCH_TIMEDFILL = A6,
     PIN_INPUT_SWITCH_STOP = A7,
 
-    PIN_INPUT_420MA_RTD = A0
+    PIN_ANALOG_INPUT_420MA_RTD = A0
 };
 
 typedef struct
@@ -70,6 +75,7 @@ typedef struct
     bool routeToHeater;
 } InputPinConfig;
 
+//   PIN                           HIGH SIG              LOW SIG                DW    HT
 static const InputPinConfig inputs[] = {
     {PIN_INPUT_SWITCH_DOOR,        DOOR_OPEN_SIG,        DOOR_CLOSE_SIG,        true, false},
     {PIN_INPUT_SWITCH_FLOAT,       FLOAT_OPEN_SIG,       FLOAT_CLOSE_SIG,       true, true },
@@ -82,7 +88,7 @@ static const InputPinConfig inputs[] = {
 void BSP_init(void)
 {
     // Initialize the output pins
-    for (size_t i = 0; i < ARRAY_SIZE(outputs); i++)
+    for (size_t i = 0; i < NUM_OUTPUTS; i++)
     {
         pinMode(outputs[i].pin, OUTPUT);
 
@@ -91,19 +97,57 @@ void BSP_init(void)
     }
 
     // Initialize the input pins
-    for (size_t i = 0; i < ARRAY_SIZE(inputs); i++)
+    for (size_t i = 0; i < NUM_INPUTS; i++)
     {
         // We have hardware pullups on every input
         pinMode(inputs[i].pin, INPUT);
     }
 
     // Initialize the 4-20mA input pin
-    pinMode(PIN_INPUT_420MA_RTD, INPUT);
+    pinMode(PIN_ANALOG_INPUT_420MA_RTD, INPUT);
 }
 
 ISR(TIMER2_COMPA_vect)
 {
     QF_tickXISR(0); // process time events for tick rate 0
+
+    // Debounce switch inputs
+    static uint8_t stable[NUM_INPUTS] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
+    static uint8_t last[NUM_INPUTS] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
+    static uint8_t count[NUM_INPUTS] = {0, 0, 0, 0, 0, 0};
+
+    for (uint8_t i = 0; i < NUM_INPUTS; i++)
+    {
+        uint8_t reading = digitalRead(inputs[i].pin);
+
+        if (reading == last[i])
+        {
+            if (count[i] < DEBOUNCE_COUNT)
+            {
+                count[i]++;
+            }
+            if (count[i] >= DEBOUNCE_COUNT && reading != stable[i])
+            {
+                stable[i] = reading;
+
+                if (stable[i] == LOW)
+                {
+                    if (inputs[i].routeToDishwasher) QACTIVE_POST_ISR(AO_Dishwasher, inputs[i].lowSignal, i);
+                    //if (inputs[i].routeToHeater) QACTIVE_POST_ISR(AO_Heater, inputs[i].lowSignal, i);
+                }
+                else
+                {
+                    if (inputs[i].routeToDishwasher) QACTIVE_POST_ISR(AO_Dishwasher, inputs[i].highSignal, i);
+                    //if (inputs[i].routeToHeater) QACTIVE_POST_ISR(AO_Heater, inputs[i].highSignal, i);
+                }
+            }
+        }
+        else
+        {
+            count[i] = 0;
+        }
+        last[i] = reading;
+    }
 }
 
 void QF_onStartup(void)

@@ -5,6 +5,14 @@
  <package name="AOs" stereotype="0x02">
   <class name="Dishwasher" superclass="qpn::QActive">
    <statechart properties="0x01">
+    <initial target="../1">
+     <initial_glyph conn="8,6,5,0,13,5">
+      <action box="0,-2,10,2"/>
+     </initial_glyph>
+    </initial>
+    <state name="state1">
+     <state_glyph node="5,11,23,16"/>
+    </state>
     <state_diagram size="30,30"/>
    </statechart>
   </class>
@@ -21,6 +29,7 @@ extern &quot;C&quot; {
 #include &quot;qpn.h&quot;
 #include &quot;signals.h&quot;
 #include &quot;constants.h&quot;
+#include &quot;active_objects.h&quot;
 
 $declare${AOs::Dishwasher}
 
