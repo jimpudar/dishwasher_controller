@@ -21,6 +21,7 @@
 #include <Arduino.h>
 
 #include "bsp.h"
+#include "debug.h"
 #include "qm_generated/dishwasher_sm.h"
 
 static Dishwasher dishwasher_inst;
@@ -37,8 +38,11 @@ QActiveCB const Q_ROM QF_active[] = {
 
 void setup()
 {
+    DEBUG_INIT();
+    DEBUG_PRINTLN("QF_init");
     QF_init(Q_DIM(QF_active));
 
+    DEBUG_PRINTLN("QActive_ctor Dishwasher");
     QActive_ctor(&dishwasher_inst.super, Q_STATE_CAST(&Dishwasher_initial));
 
     BSP_init();

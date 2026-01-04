@@ -3,14 +3,14 @@
 #include "qpn.h"
 
 #include "constants.h"
+#include "debug.h"
 #include "qm_generated/dishwasher_sm.h"
 #include "signals.h"
 #include <Arduino.h>
 
 enum
 {
-    BSP_TICKS_PER_SEC = 100, // number of system clock ticks in one second
-    DEBOUNCE_COUNT = 5, // number of ticks an input needs to be stable to count
+    DEBOUNCE_COUNT = 5,      // number of ticks an input needs to be stable to count
 
     NUM_OUTPUTS = 8,
     PIN_OUTPUT_RELAY_MOTOR = 2,
@@ -107,6 +107,26 @@ void BSP_init(void)
     pinMode(PIN_ANALOG_INPUT_420MA_RTD, INPUT);
 }
 
+uint8_t readTemperature()
+{
+    uint16_t raw = analogRead(PIN_ANALOG_INPUT_420MA_RTD);
+
+    // AVR ADC: 10-bit, 0-1023, with 5V reference
+    // voltsV = raw / 1023 * 5V
+    // currentA = voltsV / 250Ohm
+    // currentmA = voltsV * 4mS
+
+    // Scaling function for -50C to 150C RTD - will need to change if the RTD / transmitter is different
+    // temp = (currentmA - 4) * 12.5 - 50
+
+    uint8_t temp = ((int32_t)raw * 250 - 102300) / 1023;
+    DEBUG_PRINT(F("Read temperature"));
+    DEBUG_PRINT(temp);
+    DEBUG_PRINTLN(F(" C"));
+
+    return temp;
+}
+
 ISR(TIMER2_COMPA_vect)
 {
     QF_tickXISR(0); // process time events for tick rate 0
@@ -132,13 +152,21 @@ ISR(TIMER2_COMPA_vect)
 
                 if (stable[i] == LOW)
                 {
-                    if (inputs[i].routeToDishwasher) QACTIVE_POST_ISR(AO_Dishwasher, inputs[i].lowSignal, i);
-                    //if (inputs[i].routeToHeater) QACTIVE_POST_ISR(AO_Heater, inputs[i].lowSignal, i);
+                    DEBUG_PRINT(F("INPUT "));
+                    DEBUG_PRINT(inputs[i].pin);
+                    DEBUG_PRINTLN(F(" WENT LOW"));
+                    if (inputs[i].routeToDishwasher)
+                        QACTIVE_POST_ISR(AO_Dishwasher, inputs[i].lowSignal, i);
+                    // if (inputs[i].routeToHeater) QACTIVE_POST_ISR(AO_Heater, inputs[i].lowSignal, i);
                 }
                 else
                 {
-                    if (inputs[i].routeToDishwasher) QACTIVE_POST_ISR(AO_Dishwasher, inputs[i].highSignal, i);
-                    //if (inputs[i].routeToHeater) QACTIVE_POST_ISR(AO_Heater, inputs[i].highSignal, i);
+                    DEBUG_PRINT(F("INPUT "));
+                    DEBUG_PRINT(inputs[i].pin);
+                    DEBUG_PRINTLN(F(" WENT HIGH"));
+                    if (inputs[i].routeToDishwasher)
+                        QACTIVE_POST_ISR(AO_Dishwasher, inputs[i].highSignal, i);
+                    // if (inputs[i].routeToHeater) QACTIVE_POST_ISR(AO_Heater, inputs[i].highSignal, i);
                 }
             }
         }
