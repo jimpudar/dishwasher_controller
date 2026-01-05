@@ -75,6 +75,16 @@ typedef struct
     bool routeToHeater;
 } InputPinConfig;
 
+enum InputIndex
+{
+    SWITCH_DOOR_IDX = 0,
+    SWITCH_FLOAT_IDX = 1,
+    SWITCH_MANUALRINSE_IDX = 2,
+    SWITCH_MANUALWASH_IDX = 3,
+    SWITCH_TIMEDFILL_IDX = 4,
+    SWITCH_STOP_IDX = 5
+};
+
 //   PIN                           HIGH SIG              LOW SIG                DW    HT
 static const InputPinConfig inputs[] = {
     {PIN_INPUT_SWITCH_DOOR,        DOOR_OPEN_SIG,        DOOR_CLOSE_SIG,        true, false},
@@ -84,6 +94,29 @@ static const InputPinConfig inputs[] = {
     {PIN_INPUT_SWITCH_TIMEDFILL,   TIMEDFILL_OPEN_SIG,   TIMEDFILL_CLOSE_SIG,   true, false},
     {PIN_INPUT_SWITCH_STOP,        STOP_OPEN_SIG,        STOP_CLOSE_SIG,        true, false},
 };
+
+// Modified in the ISR
+static volatile uint8_t stable[NUM_INPUTS] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
+
+bool BSP_isDoorClosed()
+{
+    return stable[SWITCH_DOOR_IDX] == LOW;
+}
+
+bool BSP_isFloatClosed()
+{
+    return stable[SWITCH_FLOAT_IDX] == LOW;
+}
+
+bool BSP_isManualRinseClosed()
+{
+    return stable[SWITCH_MANUALRINSE_IDX] == LOW;
+}
+
+bool BSP_isManualWashClosed()
+{
+    return stable[SWITCH_MANUALWASH_IDX] == LOW;
+}
 
 void BSP_init(void)
 {
@@ -106,8 +139,6 @@ void BSP_init(void)
     // Initialize the 4-20mA input pin
     pinMode(PIN_ANALOG_INPUT_420MA_RTD, INPUT);
 }
-
-
 
 int16_t BSP_readTemperature(void)
 {
@@ -156,7 +187,6 @@ ISR(TIMER2_COMPA_vect)
     QF_tickXISR(0); // process time events for tick rate 0
 
     // Debounce switch inputs
-    static uint8_t stable[NUM_INPUTS] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
     static uint8_t last[NUM_INPUTS] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
     static uint8_t count[NUM_INPUTS] = {0, 0, 0, 0, 0, 0};
 
