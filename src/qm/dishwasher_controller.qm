@@ -6,20 +6,202 @@
   <class name="Dishwasher" superclass="qpn::QActive">
    <statechart properties="0x01">
     <initial target="../1">
-     <initial_glyph conn="8,6,5,0,13,5">
+     <initial_glyph conn="16,6,5,0,18,5">
       <action box="0,-2,10,2"/>
      </initial_glyph>
     </initial>
-    <state name="state1">
-     <tran trig="DOOR_CLOSE" target="..">
-      <action>BSP_readTemperature();</action>
-      <tran_glyph conn="28,16,1,1,2,7,-2">
-       <action box="0,-2,16,2"/>
+    <state name="Operating">
+     <initial target="../7">
+      <initial_glyph conn="28,15,5,0,10,4">
+       <action box="0,-3,10,2"/>
+      </initial_glyph>
+     </initial>
+     <tran trig="STARTUP_FAULT" target="../6">
+      <tran_glyph conn="130,62,1,1,2,9,-12">
+       <action box="0,-2,14,2"/>
       </tran_glyph>
      </tran>
-     <state_glyph node="5,11,23,16"/>
+     <tran trig="RTD_FAULT" target="../6">
+      <tran_glyph conn="130,57,1,1,4,16,-14">
+       <action box="0,-2,10,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="OVER_TEMP_FAULT" target="../6">
+      <tran_glyph conn="130,53,1,1,6,22,-16">
+       <action box="0,-2,17,2"/>
+      </tran_glyph>
+     </tran>
+     <state name="DoorClosed">
+      <documentation>This is the superstate for the door being closed. Anything which could do anything dangerous inside the machine should be inside this state.</documentation>
+      <exit>Dishwasher_handleDoorOpening();</exit>
+      <initial target="../10">
+       <initial_glyph conn="28,57,5,0,10,4">
+        <action box="0,-2,10,2"/>
+       </initial_glyph>
+      </initial>
+      <tran trig="DOOR_OPEN" target="../../5">
+       <tran_glyph conn="66,49,1,3,24">
+        <action box="0,-2,18,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="MANUALWASH_CLOSE" target="../11">
+       <tran_glyph conn="66,151,1,1,-10">
+        <action box="-9,-2,33,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="MANUALWASH_OPEN" target="../10">
+       <tran_glyph conn="8,65,3,3,18">
+        <action box="0,-2,17,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="MANUALRINSE_OPEN" target="../10">
+       <tran_glyph conn="8,67,3,3,18">
+        <action box="0,-2,17,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="MANUALRINSE_CLOSE" target="../12">
+       <tran_glyph conn="66,171,1,1,-10">
+        <action box="-9,-2,18,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="FLOAT_OPEN" target="../10">
+       <tran_glyph conn="66,83,1,1,13,-12,-23">
+        <action box="0,-2,12,2"/>
+       </tran_glyph>
+      </tran>
+      <state name="TimedFill">
+       <entry>QActive_armX(&amp;me-&gt;super, 0U, TIMEDFILL_TIMEOUT_TICKS, 0U);
+</entry>
+       <exit>QActive_disarmX(&amp;me-&gt;super, 0U);
+</exit>
+       <tran trig="Q_TIMEOUT" target="../../10">
+        <tran_glyph conn="26,100,3,3,-2,-23,2">
+         <action box="0,-2,10,2"/>
+        </tran_glyph>
+       </tran>
+       <state_glyph node="26,81,30,20">
+        <entry box="1,2,28,8"/>
+        <exit box="1,10,29,6"/>
+       </state_glyph>
+      </state>
+      <state name="WashCycle">
+       <entry>QActive_armX(&amp;me-&gt;super, 0U, WASHCYCLE_TIMEOUT_TICKS, 0U);
+Dishwasher_startWashCycle();</entry>
+       <exit>QActive_disarmX(&amp;me-&gt;super, 0U);
+Dishwasher_stopWashCycle();</exit>
+       <tran trig="Q_TIMEOUT" target="../../9">
+        <tran_glyph conn="56,121,1,1,3,10,-3">
+         <action box="-9,-2,10,2"/>
+        </tran_glyph>
+       </tran>
+       <state_glyph node="26,103,30,20">
+        <entry box="1,2,26,7"/>
+        <exit box="1,9,26,6"/>
+       </state_glyph>
+      </state>
+      <state name="RinseCycle">
+       <entry>QActive_armX(&amp;me-&gt;super, 0U, RINSECYCLE_TIMEOUT_TICKS, 0U);
+Dishwasher_startRinseCycle();</entry>
+       <exit>QActive_disarmX(&amp;me-&gt;super, 0U);
+Dishwasher_stopRinseCycle();</exit>
+       <tran trig="Q_TIMEOUT" target="../../10">
+        <tran_glyph conn="26,144,3,3,-4,-70,4">
+         <action box="0,-2,10,2"/>
+        </tran_glyph>
+       </tran>
+       <state_glyph node="26,125,30,20">
+        <entry box="1,2,25,8"/>
+        <exit box="1,10,25,6"/>
+       </state_glyph>
+      </state>
+      <state name="Idle">
+       <tran trig="TIMEDFILL_CLOSE" target="../../7">
+        <tran_glyph conn="56,77,1,1,3,8,-3">
+         <action box="-14,-2,16,2"/>
+        </tran_glyph>
+       </tran>
+       <state_glyph node="26,61,30,18"/>
+      </state>
+      <state name="ManualWash">
+       <entry>Dishwasher_turnOnPumpMotor();</entry>
+       <exit>Dishwasher_turnOffPumpMotor();</exit>
+       <state_glyph node="26,147,30,18">
+        <entry box="1,2,25,4"/>
+        <exit box="1,6,25,4"/>
+       </state_glyph>
+      </state>
+      <state name="ManualRinse">
+       <entry>Dishwasher_turnOnRinseValve();</entry>
+       <exit>Dishwasher_turnOffRinseValve();</exit>
+       <state_glyph node="26,167,30,18">
+        <entry box="1,2,25,4"/>
+        <exit box="1,6,25,4"/>
+       </state_glyph>
+      </state>
+      <state_glyph node="8,43,58,155">
+       <exit box="1,2,27,4"/>
+      </state_glyph>
+     </state>
+     <state name="DoorOpen">
+      <documentation>The superstate for the door being open. The Dishwasher shouldn't be doing anything when the door is open.</documentation>
+      <entry>Dishwasher_handleDoorOpening();</entry>
+      <tran trig="DOOR_CLOSE">
+       <choice target="../../../4/8">
+        <guard>Dishwasher_isReadyToWash()</guard>
+        <choice_glyph conn="88,67,4,1,42,-32">
+         <action box="-22,40,23,2"/>
+        </choice_glyph>
+       </choice>
+       <choice target="../../../4/10">
+        <guard>else</guard>
+        <choice_glyph conn="88,67,5,1,-32">
+         <action box="-21,-2,10,2"/>
+        </choice_glyph>
+       </choice>
+       <tran_glyph conn="90,53,3,-1,-2,14">
+        <action box="0,-2,12,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="90,43,30,18">
+       <entry box="1,2,27,5"/>
+      </state_glyph>
+     </state>
+     <state name="Fault">
+      <documentation>If something goes wrong that is irrecoverable, the Dishwasher enters the Fault condition and stays here until the operator diagnoses and reboots it.</documentation>
+      <entry>Dishwasher_enterFaultMode();</entry>
+      <state_glyph node="90,66,30,18">
+       <entry box="1,2,23,4"/>
+      </state_glyph>
+     </state>
+     <state name="Startup">
+      <documentation>This is the first state that the dishwasher enters upon turning on.
+
+We can't have a default transition with a choice, so this is the workaround. All this does is transition to either the door open or door closed state.</documentation>
+      <entry>Dishwasher_startup((QActive *) me);</entry>
+      <tran trig="STARTUP">
+       <choice target="../../../4">
+        <guard>BSP_isDoorClosed()</guard>
+        <choice_glyph conn="78,31,5,0,-18,12">
+         <action box="-18,-2,16,2"/>
+        </choice_glyph>
+       </choice>
+       <choice target="../../../5">
+        <guard>else</guard>
+        <choice_glyph conn="78,31,5,0,18,12">
+         <action box="14,-2,10,2"/>
+        </choice_glyph>
+       </choice>
+       <tran_glyph conn="56,27,1,-1,22,4">
+        <action box="0,-2,26,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="26,19,30,18">
+       <entry box="1,2,17,5"/>
+      </state_glyph>
+     </state>
+     <state_glyph node="4,11,126,189"/>
     </state>
-    <state_diagram size="86,74"/>
+    <state_diagram size="147,296"/>
    </statechart>
   </class>
  </package>

@@ -31,20 +31,313 @@
 /*.${AOs::Dishwasher::SM} ..................................................*/
 QState Dishwasher_initial(Dishwasher * const me) {
     /*.${AOs::Dishwasher::SM::initial} */
-    return Q_TRAN(&Dishwasher_state1);
+    return Q_TRAN(&Dishwasher_Operating);
 }
-/*.${AOs::Dishwasher::SM::state1} ..........................................*/
-QState Dishwasher_state1(Dishwasher * const me) {
+/*.${AOs::Dishwasher::SM::Operating} .......................................*/
+QState Dishwasher_Operating(Dishwasher * const me) {
     QState status_;
     switch (Q_SIG(me)) {
-        /*.${AOs::Dishwasher::SM::state1::DOOR_CLOSE} */
-        case DOOR_CLOSE_SIG: {
-            BSP_readTemperature();
-            status_ = Q_TRAN(&Dishwasher_state1);
+        /*.${AOs::Dishwasher::SM::Operating::initial} */
+        case Q_INIT_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Startup);
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::STARTUP_FAULT} */
+        case STARTUP_FAULT_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Fault);
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::RTD_FAULT} */
+        case RTD_FAULT_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Fault);
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::OVER_TEMP_FAULT} */
+        case OVER_TEMP_FAULT_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Fault);
             break;
         }
         default: {
             status_ = Q_SUPER(&QHsm_top);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::DoorClosed} ...........................*/
+QState Dishwasher_DoorClosed(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed} */
+        case Q_EXIT_SIG: {
+            Dishwasher_handleDoorOpening();
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::initial} */
+        case Q_INIT_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Idle);
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::DOOR_OPEN} */
+        case DOOR_OPEN_SIG: {
+            status_ = Q_TRAN(&Dishwasher_DoorOpen);
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::MANUALWASH_CLOSE} */
+        case MANUALWASH_CLOSE_SIG: {
+            status_ = Q_TRAN(&Dishwasher_ManualWash);
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::MANUALWASH_OPEN} */
+        case MANUALWASH_OPEN_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Idle);
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::MANUALRINSE_OPEN} */
+        case MANUALRINSE_OPEN_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Idle);
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::MANUALRINSE_CLOSE} */
+        case MANUALRINSE_CLOSE_SIG: {
+            status_ = Q_TRAN(&Dishwasher_ManualRinse);
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::FLOAT_OPEN} */
+        case FLOAT_OPEN_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Idle);
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_Operating);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::DoorClosed::TimedFill} ................*/
+QState Dishwasher_TimedFill(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::TimedFill} */
+        case Q_ENTRY_SIG: {
+            QActive_armX(&me->super, 0U, TIMEDFILL_TIMEOUT_TICKS, 0U);
+
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::TimedFill} */
+        case Q_EXIT_SIG: {
+            QActive_disarmX(&me->super, 0U);
+
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::TimedFill::Q_TIMEOUT} */
+        case Q_TIMEOUT_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Idle);
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_DoorClosed);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::DoorClosed::WashCycle} ................*/
+QState Dishwasher_WashCycle(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::WashCycle} */
+        case Q_ENTRY_SIG: {
+            QActive_armX(&me->super, 0U, WASHCYCLE_TIMEOUT_TICKS, 0U);
+            Dishwasher_startWashCycle();
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::WashCycle} */
+        case Q_EXIT_SIG: {
+            QActive_disarmX(&me->super, 0U);
+            Dishwasher_stopWashCycle();
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::WashCycle::Q_TIMEOUT} */
+        case Q_TIMEOUT_SIG: {
+            status_ = Q_TRAN(&Dishwasher_RinseCycle);
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_DoorClosed);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::DoorClosed::RinseCycle} ...............*/
+QState Dishwasher_RinseCycle(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::RinseCycle} */
+        case Q_ENTRY_SIG: {
+            QActive_armX(&me->super, 0U, RINSECYCLE_TIMEOUT_TICKS, 0U);
+            Dishwasher_startRinseCycle();
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::RinseCycle} */
+        case Q_EXIT_SIG: {
+            QActive_disarmX(&me->super, 0U);
+            Dishwasher_stopRinseCycle();
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::RinseCycle::Q_TIMEOUT} */
+        case Q_TIMEOUT_SIG: {
+            status_ = Q_TRAN(&Dishwasher_Idle);
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_DoorClosed);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::DoorClosed::Idle} .....................*/
+QState Dishwasher_Idle(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::Idle::TIMEDFILL_CLOSE} */
+        case TIMEDFILL_CLOSE_SIG: {
+            status_ = Q_TRAN(&Dishwasher_TimedFill);
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_DoorClosed);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::DoorClosed::ManualWash} ...............*/
+QState Dishwasher_ManualWash(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::ManualWash} */
+        case Q_ENTRY_SIG: {
+            Dishwasher_turnOnPumpMotor();
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::ManualWash} */
+        case Q_EXIT_SIG: {
+            Dishwasher_turnOffPumpMotor();
+            status_ = Q_HANDLED();
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_DoorClosed);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::DoorClosed::ManualRinse} ..............*/
+QState Dishwasher_ManualRinse(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::ManualRinse} */
+        case Q_ENTRY_SIG: {
+            Dishwasher_turnOnRinseValve();
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorClosed::ManualRinse} */
+        case Q_EXIT_SIG: {
+            Dishwasher_turnOffRinseValve();
+            status_ = Q_HANDLED();
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_DoorClosed);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::DoorOpen} .............................*/
+QState Dishwasher_DoorOpen(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::DoorOpen} */
+        case Q_ENTRY_SIG: {
+            Dishwasher_handleDoorOpening();
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::DoorOpen::DOOR_CLOSE} */
+        case DOOR_CLOSE_SIG: {
+            /*.${AOs::Dishwasher::SM::Operating::DoorOpen::DOOR_CLOSE::[Dishwasher_isReadyToWash()]} */
+            if (Dishwasher_isReadyToWash()) {
+                status_ = Q_TRAN(&Dishwasher_WashCycle);
+            }
+            /*.${AOs::Dishwasher::SM::Operating::DoorOpen::DOOR_CLOSE::[else]} */
+            else {
+                status_ = Q_TRAN(&Dishwasher_Idle);
+            }
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_Operating);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::Fault} ................................*/
+QState Dishwasher_Fault(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::Fault} */
+        case Q_ENTRY_SIG: {
+            Dishwasher_enterFaultMode();
+            status_ = Q_HANDLED();
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_Operating);
+            break;
+        }
+    }
+    return status_;
+}
+/*.${AOs::Dishwasher::SM::Operating::Startup} ..............................*/
+QState Dishwasher_Startup(Dishwasher * const me) {
+    QState status_;
+    switch (Q_SIG(me)) {
+        /*.${AOs::Dishwasher::SM::Operating::Startup} */
+        case Q_ENTRY_SIG: {
+            Dishwasher_startup((QActive *) me);
+            status_ = Q_HANDLED();
+            break;
+        }
+        /*.${AOs::Dishwasher::SM::Operating::Startup::STARTUP} */
+        case STARTUP_SIG: {
+            /*.${AOs::Dishwasher::SM::Operating::Startup::STARTUP::[BSP_isDoorClosed()]} */
+            if (BSP_isDoorClosed()) {
+                status_ = Q_TRAN(&Dishwasher_DoorClosed);
+            }
+            /*.${AOs::Dishwasher::SM::Operating::Startup::STARTUP::[else]} */
+            else {
+                status_ = Q_TRAN(&Dishwasher_DoorOpen);
+            }
+            break;
+        }
+        default: {
+            status_ = Q_SUPER(&Dishwasher_Operating);
             break;
         }
     }

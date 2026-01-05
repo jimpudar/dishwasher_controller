@@ -5,7 +5,9 @@
 
 enum DishwasherSignals
 {
-    DOOR_OPEN_SIG = Q_USER_SIG,
+    STARTUP_SIG = Q_USER_SIG,
+
+    DOOR_OPEN_SIG,
     DOOR_CLOSE_SIG,
     FLOAT_OPEN_SIG,
     FLOAT_CLOSE_SIG,
@@ -18,7 +20,9 @@ enum DishwasherSignals
     STOP_OPEN_SIG,
     STOP_CLOSE_SIG,
 
-    RTD_FAULT_SIG
+    STARTUP_FAULT_SIG,
+    RTD_FAULT_SIG,
+    OVER_TEMP_FAULT_SIG,
 };
 
 #endif // DISHWASHERCONTROLLER_SIGNALS_H

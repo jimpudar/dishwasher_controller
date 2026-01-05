@@ -37,7 +37,17 @@ typedef struct Dishwasher {
 
 /* protected: */
 QState Dishwasher_initial(Dishwasher * const me);
-QState Dishwasher_state1(Dishwasher * const me);
+QState Dishwasher_Operating(Dishwasher * const me);
+QState Dishwasher_DoorClosed(Dishwasher * const me);
+QState Dishwasher_TimedFill(Dishwasher * const me);
+QState Dishwasher_WashCycle(Dishwasher * const me);
+QState Dishwasher_RinseCycle(Dishwasher * const me);
+QState Dishwasher_Idle(Dishwasher * const me);
+QState Dishwasher_ManualWash(Dishwasher * const me);
+QState Dishwasher_ManualRinse(Dishwasher * const me);
+QState Dishwasher_DoorOpen(Dishwasher * const me);
+QState Dishwasher_Fault(Dishwasher * const me);
+QState Dishwasher_Startup(Dishwasher * const me);
 /*.$enddecl${AOs::Dishwasher} ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^*/
 
 #ifdef __cplusplus

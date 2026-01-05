@@ -10,7 +10,7 @@
 
 enum
 {
-    DEBOUNCE_COUNT = 5,      // number of ticks an input needs to be stable to count
+    DEBOUNCE_COUNT = 5, // number of ticks an input needs to be stable to count
 
     NUM_OUTPUTS = 8,
     PIN_OUTPUT_RELAY_MOTOR = 2,
@@ -60,6 +60,11 @@ static const OutputPinConfig outputs[] = {
     {PIN_OUTPUT_INDICATOR_READY, HIGH, INACTIVE},
 };
 
+void BSP_setOutputLogicalState(Output outputIdx, LogicalState logicalState)
+{
+    digitalWrite(outputs[outputIdx].pin, pinLevel(outputs[outputIdx].activePinState, logicalState));
+}
+
 typedef struct
 {
     uint8_t pin;
@@ -75,15 +80,6 @@ typedef struct
     bool routeToHeater;
 } InputPinConfig;
 
-enum InputIndex
-{
-    SWITCH_DOOR_IDX = 0,
-    SWITCH_FLOAT_IDX = 1,
-    SWITCH_MANUALRINSE_IDX = 2,
-    SWITCH_MANUALWASH_IDX = 3,
-    SWITCH_TIMEDFILL_IDX = 4,
-    SWITCH_STOP_IDX = 5
-};
 
 //   PIN                           HIGH SIG              LOW SIG                DW    HT
 static const InputPinConfig inputs[] = {
@@ -98,27 +94,15 @@ static const InputPinConfig inputs[] = {
 // Modified in the ISR
 static volatile uint8_t stable[NUM_INPUTS] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
 
-bool BSP_isDoorClosed()
-{
-    return stable[SWITCH_DOOR_IDX] == LOW;
-}
+bool BSP_isDoorClosed() { return stable[SWITCH_DOOR] == LOW; }
 
-bool BSP_isFloatClosed()
-{
-    return stable[SWITCH_FLOAT_IDX] == LOW;
-}
+bool BSP_isFloatClosed() { return stable[SWITCH_FLOAT] == LOW; }
 
-bool BSP_isManualRinseClosed()
-{
-    return stable[SWITCH_MANUALRINSE_IDX] == LOW;
-}
+bool BSP_isManualRinseClosed() { return stable[SWITCH_MANUALRINSE] == LOW; }
 
-bool BSP_isManualWashClosed()
-{
-    return stable[SWITCH_MANUALWASH_IDX] == LOW;
-}
+bool BSP_isManualWashClosed() { return stable[SWITCH_MANUALWASH] == LOW; }
 
-void BSP_init(void)
+void BSP_init()
 {
     // Initialize the output pins
     for (size_t i = 0; i < NUM_OUTPUTS; i++)
@@ -140,7 +124,7 @@ void BSP_init(void)
     pinMode(PIN_ANALOG_INPUT_420MA_RTD, INPUT);
 }
 
-int16_t BSP_readTemperature(void)
+int16_t BSP_readTemperature()
 {
     // AVR ADC: 10-bit, 0-1023, with 5V reference
 
@@ -153,7 +137,8 @@ int16_t BSP_readTemperature(void)
     // oversample to 1023 * 4 == 4092 bits
 
     uint16_t adc = sum >> 2;
-    if (adc < 820) {  // ~4mA threshold in 12-bit scale
+    if (adc < 820)
+    { // ~4mA threshold in 12-bit scale
         QACTIVE_POST(AO_Dishwasher, RTD_FAULT_SIG, 0);
         // QACTIVE_POST(AO_Heater, RTD_FAULT_SIG, 0);
         return INT16_MIN;
@@ -175,8 +160,10 @@ int16_t BSP_readTemperature(void)
 }
 
 // bodge since I didn't RTFM (A6 and A7 are analog only)
-bool readDigitalInput(uint8_t pin) {
-    if (pin == A6 || pin == A7) {
+static bool readDigitalInput(uint8_t pin)
+{
+    if (pin == A6 || pin == A7)
+    {
         return analogRead(pin) > 512;
     }
     return digitalRead(pin);
